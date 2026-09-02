@@ -1,0 +1,21 @@
+# JavaScript
+node_modules/
+.next/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Environment and generated data
+.env
+.env.*
+!.env.example
+postgres_data/
+
+# Editors
+.DS_Store
+.idea/
+.vscode/
