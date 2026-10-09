@@ -10,15 +10,19 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  FileText,
   GraduationCap,
   Layers,
   LogOut,
   Plus,
   Sparkles,
+  ShieldCheck,
   Trash2,
   User as UserIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NotesPanel } from "./notes-panel";
+import { SecurityDialog } from "./security-dialog";
 import {
   User,
   Semester,
@@ -44,7 +48,7 @@ import {
   clearToken,
 } from "@/lib/api";
 
-type TabType = "overview" | "semesters" | "subjects" | "topics" | "exams";
+type TabType = "overview" | "semesters" | "subjects" | "topics" | "exams" | "notes";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -65,6 +69,7 @@ export default function DashboardPage() {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showTopicModal, setShowTopicModal] = useState(false);
   const [showExamModal, setShowExamModal] = useState(false);
+  const [showSecurityDialog, setShowSecurityDialog] = useState(false);
 
   // Form states
   const [semForm, setSemForm] = useState({ name: "", semester_number: 1, is_active: true });
@@ -432,6 +437,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+            <Button variant="ghost" size="default" aria-label="Account security" onClick={() => setShowSecurityDialog(true)} className="text-xs text-slate-600 hover:text-indigo-700">
+              <ShieldCheck className="mr-1 h-3.5 w-3.5" /> <span className="hidden sm:inline">Security</span>
+            </Button>
             <Button variant="ghost" size="default" onClick={handleLogout} className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50">
               <LogOut className="h-3.5 w-3.5 mr-1" /> Sign Out
             </Button>
@@ -489,6 +497,16 @@ export default function DashboardPage() {
             }`}
           >
             <Calendar className="h-4 w-4" /> Exams ({exams.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("notes")}
+            className={`py-3 px-1 border-b-2 font-medium text-xs flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+              activeTab === "notes"
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <FileText className="h-4 w-4" /> Notes
           </button>
         </div>
       </header>
@@ -1101,7 +1119,11 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        {activeTab === "notes" && <NotesPanel subjects={subjects} topics={topics} />}
       </main>
+
+      <SecurityDialog open={showSecurityDialog} onClose={() => setShowSecurityDialog(false)} />
 
       {/* ----------------- MODAL: CREATE SEMESTER ----------------- */}
       {showSemesterModal && (

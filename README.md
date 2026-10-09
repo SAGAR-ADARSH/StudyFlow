@@ -1,14 +1,14 @@
 # StudyFlow
 
-StudyFlow is a lightweight AI-powered study companion designed for MCA/B.Tech college students to organize semesters, subjects, syllabus topics, and exam schedules.
+StudyFlow is a lightweight AI-powered study companion designed for MCA/B.Tech college students to organize semesters, subjects, syllabus topics, exam schedules, and personal study notes.
 
 ## Stack & Architecture
 
 - **Frontend:** Next.js (App Router, React 19, Tailwind CSS, Lucide Icons)
 - **Backend API:** FastAPI (Python 3.11+), Pydantic v2
 - **ORM & Database:** SQLAlchemy 2.0 (Async), MySQL 8.0 / MariaDB
-- **Authentication & Security:** JWT (JSON Web Tokens), `pwdlib` with `bcrypt` password hashing
-- **Application Services:** Modular service layer (`AuthService`, `SemesterService`, `SubjectService`, `TopicService`, `ExamService`, `PriorityEngine`, `StorageService`)
+- **Authentication & Security:** short-lived issuer-bound JWT access tokens, Argon2id password hashes (legacy bcrypt hashes are upgraded at login), and password-change session revocation
+- **Application Services:** Modular service layer (`AuthService`, `SemesterService`, `SubjectService`, `TopicService`, `ExamService`, `NoteService`, `PriorityEngine`, `StorageService`)
 
 ```text
 React Frontend (Next.js)
@@ -19,7 +19,7 @@ Application Services
         ↓
 Rule-Based Priority Engine
         ↓
-MySQL Database (Users, Semesters, Subjects, Topics, Exams)
+MySQL Database (Users, Semesters, Subjects, Topics, Exams, Notes)
         ↓
 File Storage (Uploads)
 ```
@@ -37,11 +37,14 @@ File Storage (Uploads)
    ```bash
    cp .env.example .env
    ```
-   Set your MySQL connection string in `.env`:
+   Set your MySQL connection string and a unique JWT secret in `.env`:
    ```env
    DATABASE_URL=mysql+aiomysql://root:yourpassword@localhost:3306/studyflow
-   JWT_SECRET_KEY=your-32-character-secret-key
+   JWT_SECRET_KEY=your-random-64-character-hex-secret
+   ACCESS_TOKEN_EXPIRE_MINUTES=60
    ```
+   Generate a secret with `openssl rand -hex 32`. Never deploy the example or development secret.
+   Existing installations can rerun `mysql_setup.sql`; its idempotent table creation adds the Notes table.
 
 ## Running the Application
 
@@ -83,11 +86,12 @@ PYTHONPATH=apps/api pytest apps/api/tests -v
 
 | Module | Method | Endpoint | Description |
 |---|---|---|---|
-| **Auth** | `POST` | `/api/v1/auth/register` | Register new student account |
-| **Auth** | `POST` | `/api/v1/auth/login` | Authenticate and obtain JWT token |
+| **Auth** | `POST` | `/api/v1/auth/register` | Register a student account (12+ character strong password) |
+| **Auth** | `POST` | `/api/v1/auth/login` | Authenticate and obtain a 60-minute JWT access token |
+| **Auth** | `POST` | `/api/v1/auth/change-password` | Change password, revoke other sessions, and return a fresh token |
 | **Auth** | `GET` | `/api/v1/auth/me` | Fetch authenticated user details |
 | **Users** | `GET` | `/api/v1/users/me` | Get user profile |
-| **Users** | `PUT` | `/api/v1/users/me` | Update profile / change password |
+| **Users** | `PUT` | `/api/v1/users/me` | Update profile details |
 | **Semesters** | `GET` | `/api/v1/semesters` | List student semesters with counts |
 | **Semesters** | `POST` | `/api/v1/semesters` | Create new semester |
 | **Semesters** | `GET` | `/api/v1/semesters/{id}` | Get semester by ID |
@@ -110,3 +114,14 @@ PYTHONPATH=apps/api pytest apps/api/tests -v
 | **Exams** | `GET` | `/api/v1/exams/{id}` | Get exam details |
 | **Exams** | `PUT` | `/api/v1/exams/{id}` | Update exam details / record score |
 | **Exams** | `DELETE` | `/api/v1/exams/{id}` | Delete exam |
+| **Notes** | `GET` | `/api/v1/notes` | List/search notes (query, subject, topic, pinned, pagination filters) |
+| **Notes** | `POST` | `/api/v1/notes` | Create a note with optional subject/topic links and tags |
+| **Notes** | `GET` | `/api/v1/notes/{id}` | Get a note |
+| **Notes** | `PUT` | `/api/v1/notes/{id}` | Update note content, links, tags, or pin state |
+| **Notes** | `DELETE` | `/api/v1/notes/{id}` | Delete a note |
+
+### Notes and account security
+
+Notes are private to their owner and can be linked to one of their subjects and topics. They support plain-text content, up to 20 tags, pinning, server-side search across note text/tags/linked names, and pagination. Deleting a linked subject or topic keeps the note and clears the deleted reference.
+
+Registration and password changes require at least 12 characters including uppercase, lowercase, and a number. New passwords are hashed with Argon2id; legacy bcrypt hashes continue to verify and are upgraded after a successful login. Access tokens are issuer-bound, expire after 60 minutes by default, and are invalidated across existing sessions when the account password changes.
