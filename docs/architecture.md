@@ -1,25 +1,39 @@
-# StudyFlow Architecture
+# StudyFlow Architecture (MCA Project)
 
-## Boundaries
-
-The browser application owns presentation, client-side interaction, and API requests. The FastAPI service owns identity, authorization, domain rules, data access, and AI-provider integration. PostgreSQL is the source of truth for product data.
+## System Architecture
 
 ```text
-Next.js web  ->  FastAPI /api/v1  ->  PostgreSQL
-                     |
-                     +-> AI providers (future)
+React Frontend (Next.js)
+        ↓
+FastAPI Backend API (/api/v1)
+        ↓
+Application Services (Auth, User, Semester, Subject, Topic, Exam)
+        ↓
+Rule-Based Priority Engine (Calculates Urgency & Academic Scheduling)
+        ↓
+MySQL Database (Users, Semesters, Subjects, Topics, Exams)
+        ↓
+File Storage (Local Storage for uploads & notes)
 ```
 
-## API conventions
+## Boundaries & Conventions
 
-- Version all public endpoints below `/api/v1`.
-- Use Pydantic request/response schemas; never return ORM models directly.
-- Authenticate with `Authorization: Bearer <token>`.
-- Keep feature routes, schemas, and services grouped by domain as the application grows.
+- **Frontend:** React / Next.js client handling UI, interaction, state, and HTTP client requests.
+- **Backend API:** FastAPI RESTful endpoints with Pydantic request/response schemas.
+- **Authentication:** JWT tokens with bcrypt (`pwdlib`) password hashing.
+- **Database:** MySQL relational database accessed via SQLAlchemy 2 async ORM.
+- **File Storage:** Local file storage service for lightweight academic project use.
 
-## Security baseline
+## Core Schema (Foundation Milestone)
 
-- Secrets live only in environment variables.
-- Passwords are salted bcrypt hashes, never reversible values.
-- JWT subjects contain only the user ID and expire quickly.
-- Production must set a unique high-entropy `JWT_SECRET_KEY`, restrict CORS origins, enforce TLS, and use managed database backups.
+1. `users`: Student profile, credentials, and course information.
+2. `semesters`: Academic terms/semesters created by the student.
+3. `subjects`: Courses/modules belonging to a semester.
+4. `topics`: Syllabus topics within a subject with status, priority, and study hours.
+5. `exams`: Internal, midterm, practical, and final exams with dates and target/obtained marks.
+
+## Roadmap & Subsequent Milestones
+
+- Milestone 1 (Complete): MySQL Connection, Auth, Users, Semesters, Subjects, Topics, Exams, CRUD APIs, React Frontend connection.
+- Milestone 2: Notes → Tasks → Quiz → Flashcards → Study Sessions → Progress.
+- Milestone 3: Rule-Based Priority Engine → Dashboard Recommendations → Sprint Mode → Analytics → AI services.

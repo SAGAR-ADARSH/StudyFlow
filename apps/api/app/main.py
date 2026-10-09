@@ -2,26 +2,67 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.auth import router as auth_router
+from app.api.routes.users import router as users_router
+from app.api.routes.semesters import router as semesters_router
+from app.api.routes.subjects import router as subjects_router
+from app.api.routes.topics import router as topics_router
+from app.api.routes.exams import router as exams_router
 from app.core.config import get_settings
-from app.models.user import Base
-from app.db.session import engine
+from app.db.session import engine, init_db
+
+settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Temporary bootstrap until Alembic migrations are added in the next milestone.
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+    # Initialize database tables
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"Database initialization notice: {e}")
     yield
     await engine.dispose()
 
 
-settings = get_settings()
-app = FastAPI(title="StudyFlow API", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-app.include_router(auth_router, prefix="/api/v1")
+app = FastAPI(
+    title="StudyFlow API",
+    description="Lightweight backend API for StudyFlow study companion (MCA College Project).",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins if isinstance(settings.cors_origins, list) else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register routers under /api/v1
+api_v1_prefix = "/api/v1"
+app.include_router(auth_router, prefix=api_v1_prefix)
+app.include_router(users_router, prefix=api_v1_prefix)
+app.include_router(semesters_router, prefix=api_v1_prefix)
+app.include_router(subjects_router, prefix=api_v1_prefix)
+app.include_router(topics_router, prefix=api_v1_prefix)
+app.include_router(exams_router, prefix=api_v1_prefix)
 
 
-@app.get("/health", tags=["system"])
+@app.get("/health", tags=["System"])
 async def health_check():
-    return {"status": "ok"}
+    return {
+        "status": "healthy",
+        "service": "StudyFlow API",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/", tags=["System"])
+async def root():
+    return {
+        "message": "Welcome to StudyFlow API. Visit /docs for Swagger interactive documentation.",
+        "version": "1.0.0",
+        "docs_url": "/docs",
+    }

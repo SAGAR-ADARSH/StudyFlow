@@ -2,6 +2,7 @@
 node_modules/
 .next/
 dist/
+*.tsbuildinfo
 
 # Python
 __pycache__/
@@ -13,7 +14,10 @@ __pycache__/
 .env
 .env.*
 !.env.example
+mysql_data/
 postgres_data/
+*.db
+uploads/
 
 # Editors
 .DS_Store
