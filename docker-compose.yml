@@ -1,19 +1,22 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: mysql:8.0
+    restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-studyflow}
-      POSTGRES_USER: ${POSTGRES_USER:-studyflow}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-studyflow}
+      MYSQL_USER: ${MYSQL_USER:-studyflow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-studyflow_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
     ports:
-      - "5432:5432"
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql_setup.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
     build: ./apps/api
@@ -34,4 +37,4 @@ services:
       - "3000:3000"
 
 volumes:
-  postgres_data:
+  mysql_data:
