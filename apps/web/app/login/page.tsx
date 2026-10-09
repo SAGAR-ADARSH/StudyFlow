@@ -184,10 +184,18 @@ export default function LoginPage() {
                   name="password"
                   type="password"
                   required
-                  placeholder="••••••••"
+                  placeholder={isRegister ? "At least 12 characters" : "Your password"}
+                  minLength={isRegister ? 12 : 1}
+                  maxLength={128}
+                  autoComplete={isRegister ? "new-password" : "current-password"}
                   className="block w-full rounded-lg border border-slate-300 pl-10 pr-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
+              {isRegister && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Use 12+ characters with at least one uppercase letter, lowercase letter, and number.
+                </p>
+              )}
             </div>
 
             {error && (

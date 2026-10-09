@@ -14,7 +14,7 @@ async def test_health_check(client: AsyncClient):
 async def test_auth_flow(client: AsyncClient):
     # 1. Register User
     reg_payload = {
-        "email": "student@studyflow.edu",
+        "email": " Student@StudyFlow.edu ",
         "password": "Password123!",
         "display_name": "Adarsh Sagar",
         "college_name": "College of Technology",
@@ -283,7 +283,7 @@ async def test_user_data_isolation(client: AsyncClient):
     # User 1
     u1_resp = await client.post(
         "/api/v1/auth/register",
-        json={"email": "u1@test.com", "password": "Password123", "display_name": "User 1"},
+        json={"email": "u1@test.com", "password": "Password123!", "display_name": "User 1"},
     )
     u1_token = u1_resp.json()["access_token"]
     u1_headers = {"Authorization": f"Bearer {u1_token}"}
@@ -291,7 +291,7 @@ async def test_user_data_isolation(client: AsyncClient):
     # User 2
     u2_resp = await client.post(
         "/api/v1/auth/register",
-        json={"email": "u2@test.com", "password": "Password123", "display_name": "User 2"},
+        json={"email": "u2@test.com", "password": "Password123!", "display_name": "User 2"},
     )
     u2_token = u2_resp.json()["access_token"]
     u2_headers = {"Authorization": f"Bearer {u2_token}"}
@@ -323,6 +323,8 @@ async def test_unauthorized_endpoints(client: AsyncClient):
         ("GET", "/api/v1/subjects"),
         ("GET", "/api/v1/topics"),
         ("GET", "/api/v1/exams"),
+        ("GET", "/api/v1/notes"),
+        ("POST", "/api/v1/notes"),
     ]
     for method, url in endpoints:
         if method == "GET":

@@ -16,6 +16,7 @@ export interface User {
 export interface AuthResponse {
   access_token: string;
   token_type: string;
+  expires_in: number;
   user?: User;
 }
 
@@ -92,6 +93,21 @@ export interface Exam {
   subject_name?: string;
   semester_name?: string;
   days_remaining?: number;
+}
+
+export interface Note {
+  id: number;
+  user_id: number;
+  subject_id: number | null;
+  topic_id: number | null;
+  title: string;
+  content: string;
+  tags: string[];
+  is_pinned: boolean;
+  created_at: string;
+  updated_at?: string | null;
+  subject_name?: string | null;
+  topic_name?: string | null;
 }
 
 // Token management in localStorage
@@ -185,13 +201,25 @@ export async function updateProfile(payload: {
   display_name?: string;
   college_name?: string;
   course_name?: string;
-  current_password?: string;
-  new_password?: string;
 }): Promise<User> {
   return request<User>("/users/me", {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export async function changePassword(payload: {
+  current_password: string;
+  new_password: string;
+}): Promise<AuthResponse> {
+  const result = await request<AuthResponse>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (result.access_token) {
+    setToken(result.access_token);
+  }
+  return result;
 }
 
 // ----------------------------------------------------------------------
@@ -441,6 +469,65 @@ export async function updateExam(
 
 export async function deleteExam(id: number): Promise<void> {
   return request<void>(`/exams/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ----------------------------------------------------------------------
+// Notes APIs
+// ----------------------------------------------------------------------
+export async function getNotes(params?: {
+  q?: string;
+  subject_id?: number;
+  topic_id?: number;
+  pinned?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<Note[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.q) queryParams.append("q", params.q);
+  if (params?.subject_id) queryParams.append("subject_id", params.subject_id.toString());
+  if (params?.topic_id) queryParams.append("topic_id", params.topic_id.toString());
+  if (params?.pinned !== undefined) queryParams.append("pinned", String(params.pinned));
+  if (params?.limit) queryParams.append("limit", params.limit.toString());
+  if (params?.offset) queryParams.append("offset", params.offset.toString());
+  const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
+  return request<Note[]>(`/notes${query}`);
+}
+
+export async function createNote(payload: {
+  title: string;
+  content: string;
+  subject_id?: number | null;
+  topic_id?: number | null;
+  tags?: string[];
+  is_pinned?: boolean;
+}): Promise<Note> {
+  return request<Note>("/notes", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateNote(
+  id: number,
+  payload: {
+    title?: string;
+    content?: string;
+    subject_id?: number | null;
+    topic_id?: number | null;
+    tags?: string[];
+    is_pinned?: boolean;
+  }
+): Promise<Note> {
+  return request<Note>(`/notes/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteNote(id: number): Promise<void> {
+  return request<void>(`/notes/${id}`, {
     method: "DELETE",
   });
 }

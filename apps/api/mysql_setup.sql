@@ -117,3 +117,26 @@ CREATE TABLE IF NOT EXISTS `exams` (
   CONSTRAINT `fk_exams_semester` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_exams_subject` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 6. Notes Table
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `notes` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `subject_id` INT DEFAULT NULL,
+  `topic_id` INT DEFAULT NULL,
+  `title` VARCHAR(180) NOT NULL,
+  `content` MEDIUMTEXT NOT NULL,
+  `tags` JSON NOT NULL,
+  `is_pinned` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_notes_user` (`user_id`),
+  INDEX `idx_notes_subject` (`subject_id`),
+  INDEX `idx_notes_topic` (`topic_id`),
+  INDEX `idx_notes_user_pinned_updated` (`user_id`, `is_pinned`, `updated_at`),
+  CONSTRAINT `fk_notes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notes_subject` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_notes_topic` FOREIGN KEY (`topic_id`) REFERENCES `topics` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
