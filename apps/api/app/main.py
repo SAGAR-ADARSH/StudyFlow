@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.api.routes.sprints import router as sprints_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.exams import router as exams_router
@@ -57,6 +58,7 @@ app.include_router(exams_router, prefix=api_v1_prefix)
 app.include_router(notes_router, prefix=api_v1_prefix)
 app.include_router(documents_router, prefix=api_v1_prefix)
 app.include_router(quizzes_router, prefix=api_v1_prefix)
+app.include_router(sprints_router, prefix=api_v1_prefix)
 
 
 @app.get("/health", tags=["System"])

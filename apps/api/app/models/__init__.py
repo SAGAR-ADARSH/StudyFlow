@@ -23,3 +23,7 @@ __all__ = [
     "Topic",
     "User",
 ]
+
+from app.models.sprint import Sprint, SprintDay, SprintTask
+
+__all__ += ["Sprint", "SprintDay", "SprintTask"]

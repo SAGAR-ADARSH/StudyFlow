@@ -819,3 +819,39 @@ export async function submitQuizAttempt(
 export async function getQuizResults(quizId: number): Promise<QuizResults> {
   return request<QuizResults>(`/quizzes/${quizId}/results`);
 }
+
+// Sprint Mode uses existing academic records and insight endpoints.
+export interface SprintTopic {
+  id: number; name: string; status: string; score: number; weak: boolean;
+  reason: string; estimated_minutes: number; remaining_minutes?: number;
+}
+export interface SprintResource {
+  kind: "document" | "note"; id: number; title: string; topic_id: number | null;
+  has_summary: boolean; content?: string;
+}
+export interface SprintTask {
+  id: number; topic_id: number | null; kind: string; title: string;
+  minutes: number; priority: number; reason: string; completed: boolean;
+}
+export interface SprintPlan {
+  id: number; exam_id: number; status: "active" | "paused" | "completed" | "cancelled";
+  daily_minutes: number; timezone: string; exam_title: string; exam_date: string;
+  subject_name: string; days_remaining: number; plan_date: string; budget_minutes: number;
+  tasks: SprintTask[]; completed_today: number; remaining_minutes: number;
+  topics_completed: number; topics_total: number; revision_topics: SprintTopic[];
+  pending_topics: SprintTopic[]; progress_percent: number; completed_tasks: number; total_tasks: number;
+  resources: SprintResource[]; quizzes: { id: number; title: string; document_id: number | null; note_id: number | null }[];
+  quiz_average: number | null; quiz_attempt_count: number; warnings: string[];
+}
+export interface SprintRecommendation { exam_id: number; title: string; days_remaining: number; reason: string }
+export const getSprints = () => request<SprintPlan[]>("/sprints");
+export const getSprintRecommendations = () => request<SprintRecommendation[]>(`/sprints/recommendations?timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`);
+export const getSprintPlan = (id: number) => request<SprintPlan>(`/sprints/${id}/daily-plan`);
+export const createSprint = (exam_id: number, daily_minutes: number, timezone: string) =>
+  request<SprintPlan>("/sprints", { method: "POST", body: JSON.stringify({ exam_id, daily_minutes, timezone }) });
+export const recalculateSprint = (id: number, daily_minutes?: number) =>
+  request<SprintPlan>(`/sprints/${id}/recalculate`, { method: "POST", body: JSON.stringify({ daily_minutes }) });
+export const updateSprintTask = (id: number, taskId: number, completed: boolean, mark_topic_completed = false) =>
+  request<SprintPlan>(`/sprints/${id}/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ completed, mark_topic_completed }) });
+export const setSprintStatus = (id: number, status: SprintPlan["status"]) =>
+  request<SprintPlan>(`/sprints/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });

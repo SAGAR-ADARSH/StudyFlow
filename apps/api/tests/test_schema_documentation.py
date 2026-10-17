@@ -2,8 +2,8 @@
 import re
 from pathlib import Path
 
-from app.models.base import Base
 import app.models  # noqa: F401  (registers every table on the metadata)
+from app.models.base import Base
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCHEMA_FILES = [REPO_ROOT / "mysql_setup.sql", REPO_ROOT / "apps" / "api" / "mysql_setup.sql"]
@@ -41,3 +41,12 @@ def test_new_phase_tables_are_additive_and_cascade_to_their_owner():
         assert "IF NOT EXISTS" in sql  # additive: never DROPs existing tables
         assert "ON DELETE CASCADE" in block
     assert "DROP TABLE" not in sql, "the documented schema must never drop existing tables"
+
+
+def test_sprint_migration_is_additive_and_matches_setup_schema():
+    sql = SCHEMA_FILES[0].read_text()
+    migration = (REPO_ROOT / "apps/api/migrations/005_sprint_mode.sql").read_text()
+    assert migration == sql[sql.index("-- Phase 5:"):]
+    assert "DROP " not in migration and "ALTER " not in migration
+    for table in ("sprints", "sprint_days", "sprint_tasks"):
+        assert "ON DELETE CASCADE" in _table_block(migration, table)

@@ -21,6 +21,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SprintPanel } from "./sprint-panel";
 import { DocumentsPanel } from "./documents-panel";
 import { NotesPanel } from "./notes-panel";
 import { SecurityDialog } from "./security-dialog";
@@ -51,7 +52,7 @@ import {
   ApiError,
 } from "@/lib/api";
 
-type TabType = "overview" | "semesters" | "subjects" | "topics" | "exams" | "notes";
+type TabType = "sprint" | "overview" | "semesters" | "subjects" | "topics" | "exams" | "notes";
 type LibraryView = "notes" | "pdfs";
 
 export default function DashboardPage() {
@@ -517,6 +518,9 @@ export default function DashboardPage() {
           >
             <FileText className="h-4 w-4" /> Notes & PDFs
           </button>
+          <button onClick={() => setActiveTab("sprint")} className={`py-3 px-1 border-b-2 font-medium text-xs flex items-center gap-1.5 whitespace-nowrap transition-colors ${activeTab === "sprint" ? "border-orange-700 text-orange-800" : "border-transparent text-slate-500 hover:text-orange-800"}`}>
+            <Sparkles className="h-4 w-4" /> Sprint Mode
+          </button>
         </div>
       </header>
 
@@ -530,6 +534,8 @@ export default function DashboardPage() {
         )}
 
         {/* TAB 1: OVERVIEW & DASHBOARD */}
+        {activeTab === "sprint" && <SprintPanel exams={exams} onTopicsChanged={() => { void getTopics().then(setTopics).catch(() => setError("Could not refresh topics. Please reload.")); }} />}
+        {activeTab === "overview" && exams.some(e => e.status === "Upcoming" && e.days_remaining != null && e.days_remaining >= 0 && e.days_remaining <= 14) && <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-950"><p>An exam is approaching. Want a focused daily study plan?</p><Button variant="ghost" className="border border-orange-300" onClick={() => setActiveTab("sprint")}>Explore Sprint Mode</Button></div>}
         {activeTab === "overview" && (
           <div className="space-y-6">
             {/* Quick Stats Grid */}

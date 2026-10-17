@@ -187,3 +187,22 @@ Everything is scoped to its owner — another student gets `404`, not someone el
 Notes are private to their owner and can be linked to one of their subjects and topics. They support plain-text content, up to 20 tags, pinning, server-side search across note text/tags/linked names, and pagination. Deleting a linked subject or topic keeps the note and clears the deleted reference.
 
 Registration and password changes require at least 12 characters including uppercase, lowercase, and a number. New passwords are hashed with Argon2id; legacy bcrypt hashes continue to verify and are upgraded after a successful login. Access tokens are issuer-bound, expire after 60 minutes by default, and are invalidated across existing sessions when the account password changes.
+
+
+## Sprint Mode (Phase 5)
+
+Open **Dashboard → Sprint Mode**, choose an upcoming exam, enter daily study minutes,
+and activate explicitly. Review the prioritized daily tasks, saved summaries and
+quizzes, track completion, change your budget, or pause/resume/finish/exit. Plans and
+completed work persist across reloads; low recent quiz scores are explainable signals,
+not automatic claims about mastery. No additional application dependency or AI key.
+
+Existing MySQL installations can apply the additive migration without resetting data:
+
+```bash
+mysql -u studyflow -p studyflow < apps/api/migrations/005_sprint_mode.sql
+PYTHONPATH=apps/api:apps/api/tests .venv/bin/python -m pytest apps/api/tests -q
+```
+
+See [Sprint implementation and acceptance report](docs/sprint-mode.md) for scheduling
+rules, files changed, API endpoints, exact run commands, test results and limitations.

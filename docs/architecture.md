@@ -67,4 +67,22 @@ Registration and password changes enforce a 12-character minimum with uppercase,
 - **Milestone 1 (complete):** MySQL connection, authentication, profiles, semesters, subjects, topics, exams, and dashboard.
 - **Milestone 2 (Phase 3):** Notes CRUD, subject/topic organization, search, tags, pinning, and stronger account security.
 - **Milestone 3 (Phase 4, complete):** PDF uploads with PyMuPDF extraction and processing states, offline extractive summaries, generated multiple-choice quizzes with graded attempts and results. See `docs/phase4-pdf-intelligence.md`.
-- **Milestone 4 (planned):** Sprint Mode (reusing the summaries and quizzes above), tasks, flashcards, study sessions, dashboard recommendations, and analytics.
+- **Milestone 4 (Phase 5, complete):** Opt-in Sprint Mode for selected exams, budgeted daily study plans, quiz-informed revision signals, persisted tasks/completions and pause/resume/history. Reuses PriorityEngine and the Phase 4 insight UI/APIs. See `docs/sprint-mode.md`.
+- **Future scope:** Flashcards, broader study-session analytics and other roadmap features.
+
+
+## Sprint Mode persistence and scheduling
+
+`SprintService` consumes owner-scoped Exam/Topic/Note/Document/Summary/QuizAttempt data.
+The existing priority engine supplies the baseline. Small explicit boosts incorporate
+user topic priority and recent quiz scores, with topic-linked notes distinguished from
+subject-level PDF evidence. Three additive tables (`sprints`, `sprint_days`,
+`sprint_tasks`) persist exam selection, timezone, daily budgets and task history.
+Completed rows survive recalculation; stable keys retain matching pending task IDs.
+Task completion and topic mastery are separate actions. A daily-plan read reconciles
+active plans with current academic data; paused/terminal plans are read-only.
+
+The dashboard's Sprint panel uses the shared SummaryModal and QuizModal; no new PDF,
+summary or quiz engine exists. Its browser requests use the existing same-origin API
+route/auth transport. `apps/api/migrations/005_sprint_mode.sql` is additive and mirrored
+in the documented setup schema. No existing table or record is reset.

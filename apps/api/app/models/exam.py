@@ -1,8 +1,16 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
 from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.semester import Semester
+    from app.models.sprint import Sprint
+    from app.models.subject import Subject
+    from app.models.user import User
 
 
 class Exam(Base):
@@ -31,3 +39,6 @@ class Exam(Base):
     user: Mapped["User"] = relationship("User", back_populates="exams")
     semester: Mapped[Optional["Semester"]] = relationship("Semester", back_populates="exams")
     subject: Mapped["Subject"] = relationship("Subject", back_populates="exams")
+
+    # ORM cascade also preserves integrity in SQLite development/tests.
+    sprints: Mapped[list["Sprint"]] = relationship("Sprint", cascade="all, delete-orphan")
