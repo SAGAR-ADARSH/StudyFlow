@@ -249,3 +249,24 @@ insights, request validation), `test_engines.py` (engine units),
 | Frontend Notes & PDFs integration | **Complete** | upload, text, summary, quiz, results, loading/error/empty states |
 | MySQL DDL documented + reproducible | **Complete** | idempotent `mysql_setup.sql`, guarded by a test |
 | Sprint Mode | **Not implemented** | intentionally deferred; summaries and quizzes are now reusable inputs for it |
+
+## Sign-in follow-up
+
+The reported dashboard failure was a missing Bearer token, not a wrong-password
+response. Same-origin client requests now send `X-StudyFlow-Token` to an explicit
+Next.js API route, which translates it into the standard Bearer header on the
+server-to-FastAPI hop. This avoids hosted gateways consuming `Authorization`;
+FastAPI still performs all existing JWT and ownership validation. Direct-API
+client configurations continue to send standard Bearer headers.
+
+Dashboard initialization now checks for a stored token before loading and handles
+401 by status (rather than error-message matching), clearing the session and
+redirecting without logging an expected authentication failure as a console error.
+
+Verification: `cd apps/web && node scripts/test-auth.cjs` passed using the actual
+API client with a localStorage shim and a fetch shim that strips Authorization.
+It covers register, sign-in, stored token, all dashboard data requests, and missing
+or invalid tokens. `npx tsc --noEmit` passed after Next regenerated its type files;
+the first attempt encountered missing generated `.next/types` files.
+The live smoke suite passed 24/24 again. These are HTTP/client regression checks,
+not a browser automation run.

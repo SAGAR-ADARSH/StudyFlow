@@ -47,6 +47,8 @@ import {
   updateExam,
   deleteExam,
   clearToken,
+  getToken,
+  ApiError,
 } from "@/lib/api";
 
 type TabType = "overview" | "semesters" | "subjects" | "topics" | "exams" | "notes";
@@ -105,6 +107,10 @@ export default function DashboardPage() {
   });
 
   async function loadData() {
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -133,12 +139,12 @@ export default function DashboardPage() {
         setSelectedSubjectId(subData[0].id);
       }
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Failed to load academic data.");
-      if (err instanceof Error && (err.message.includes("401") || err.message.includes("credentials") || err.message.includes("Authentication"))) {
+      if (err instanceof ApiError && err.status === 401) {
         clearToken();
-        router.push("/login");
+        router.replace("/login");
+        return;
       }
+      setError(err instanceof Error ? err.message : "Failed to load academic data.");
     } finally {
       setIsLoading(false);
     }

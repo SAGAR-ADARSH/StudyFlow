@@ -131,6 +131,13 @@ export function clearToken(): void {
   }
 }
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 // Generic Authenticated Fetch Helper
 async function request<T>(
   endpoint: string,
@@ -143,7 +150,10 @@ async function request<T>(
   };
 
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    // Direct API deployments use Bearer; same-origin requests use a header
+    // that hosted preview gateways do not consume. Our route translates it.
+    if (API_BASE.startsWith("/")) headers["X-StudyFlow-Token"] = token;
+    else headers["Authorization"] = `Bearer ${token}`;
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -158,7 +168,7 @@ async function request<T>(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(extractErrorMessage(data, response.status));
+    throw new ApiError(extractErrorMessage(data, response.status), response.status);
   }
 
   return data as T;
@@ -169,7 +179,10 @@ async function requestForm<T>(endpoint: string, body: FormData): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {};
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    // Direct API deployments use Bearer; same-origin requests use a header
+    // that hosted preview gateways do not consume. Our route translates it.
+    if (API_BASE.startsWith("/")) headers["X-StudyFlow-Token"] = token;
+    else headers["Authorization"] = `Bearer ${token}`;
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -180,7 +193,7 @@ async function requestForm<T>(endpoint: string, body: FormData): Promise<T> {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(extractErrorMessage(data, response.status));
+    throw new ApiError(extractErrorMessage(data, response.status), response.status);
   }
   return data as T;
 }
