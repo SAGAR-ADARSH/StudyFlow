@@ -21,6 +21,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DocumentsPanel } from "./documents-panel";
 import { NotesPanel } from "./notes-panel";
 import { SecurityDialog } from "./security-dialog";
 import {
@@ -49,6 +50,7 @@ import {
 } from "@/lib/api";
 
 type TabType = "overview" | "semesters" | "subjects" | "topics" | "exams" | "notes";
+type LibraryView = "notes" | "pdfs";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -61,6 +63,7 @@ export default function DashboardPage() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [libraryView, setLibraryView] = useState<LibraryView>("pdfs");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -506,7 +509,7 @@ export default function DashboardPage() {
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            <FileText className="h-4 w-4" /> Notes
+            <FileText className="h-4 w-4" /> Notes & PDFs
           </button>
         </div>
       </header>
@@ -1120,7 +1123,46 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {activeTab === "notes" && <NotesPanel subjects={subjects} topics={topics} />}
+        {activeTab === "notes" && (
+          <div className="space-y-5">
+            <div
+              role="tablist"
+              aria-label="Study library views"
+              className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-xs font-medium shadow-sm"
+            >
+              <button
+                role="tab"
+                aria-selected={libraryView === "pdfs"}
+                onClick={() => setLibraryView("pdfs")}
+                className={`rounded-lg px-4 py-2 transition ${
+                  libraryView === "pdfs"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                PDFs & summaries
+              </button>
+              <button
+                role="tab"
+                aria-selected={libraryView === "notes"}
+                onClick={() => setLibraryView("notes")}
+                className={`rounded-lg px-4 py-2 transition ${
+                  libraryView === "notes"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Text notes
+              </button>
+            </div>
+
+            {libraryView === "pdfs" ? (
+              <DocumentsPanel subjects={subjects} />
+            ) : (
+              <NotesPanel subjects={subjects} topics={topics} />
+            )}
+          </div>
+        )}
       </main>
 
       <SecurityDialog open={showSecurityDialog} onClose={() => setShowSecurityDialog(false)} />

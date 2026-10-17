@@ -7,8 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.document import Document, DocumentSummary
     from app.models.exam import Exam
     from app.models.note import Note
+    from app.models.quiz import Quiz, QuizAttempt
     from app.models.semester import Semester
     from app.models.subject import Subject
     from app.models.topic import Topic
@@ -33,3 +35,15 @@ class User(Base):
     topics: Mapped[list["Topic"]] = relationship("Topic", back_populates="user", cascade="all, delete-orphan")
     exams: Mapped[list["Exam"]] = relationship("Exam", back_populates="user", cascade="all, delete-orphan")
     notes: Mapped[list["Note"]] = relationship("Note", back_populates="user", cascade="all, delete-orphan")
+    documents: Mapped[list["Document"]] = relationship(
+        "Document", back_populates="user", cascade="all, delete-orphan"
+    )
+    summaries: Mapped[list["DocumentSummary"]] = relationship(
+        "DocumentSummary", back_populates="user", cascade="all, delete-orphan"
+    )
+    quizzes: Mapped[list["Quiz"]] = relationship(
+        "Quiz", back_populates="user", cascade="all, delete-orphan"
+    )
+    quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(
+        "QuizAttempt", back_populates="user", cascade="all, delete-orphan"
+    )

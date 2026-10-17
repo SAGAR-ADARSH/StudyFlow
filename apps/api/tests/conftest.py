@@ -43,6 +43,17 @@ async def override_get_db():
 app.dependency_overrides[get_db] = override_get_db
 
 
+@pytest.fixture(autouse=True)
+def isolated_upload_dir(tmp_path, monkeypatch):
+    """Keep uploaded test files inside the pytest tmp directory."""
+    from app.services.storage_service import storage_service
+
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(storage_service, "upload_dir", upload_dir)
+    return upload_dir
+
+
 @pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)

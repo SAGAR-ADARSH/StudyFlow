@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.document import DocumentSummary
+    from app.models.quiz import Quiz
     from app.models.user import User
 
 
@@ -48,3 +50,13 @@ class Note(Base):
     )
 
     user: Mapped["User"] = relationship("User", back_populates="notes")
+    summaries: Mapped[list["DocumentSummary"]] = relationship(
+        "DocumentSummary",
+        back_populates="note",
+        cascade="all, delete-orphan",
+    )
+    quizzes: Mapped[list["Quiz"]] = relationship(
+        "Quiz",
+        back_populates="note",
+        cascade="all, delete-orphan",
+    )
