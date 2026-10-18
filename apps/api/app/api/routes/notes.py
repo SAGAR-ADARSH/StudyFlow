@@ -4,9 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.api.errors import http_error
 from app.db.session import get_db
 from app.models.user import User
+from app.schemas.document import (
+    QuizGenerateRequest,
+    QuizResponse,
+    SummaryGenerateRequest,
+    SummaryResponse,
+)
 from app.schemas.note import NoteCreate, NoteResponse, NoteUpdate
+from app.services.insight_service import insight_service
 from app.services.note_service import note_service
 
 router = APIRouter(prefix="/notes", tags=["Notes"])
@@ -84,3 +92,86 @@ async def delete_note(
     deleted = await note_service.delete(db, current_user.id, note_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+
+
+# ---------------------------------------------------------------------------
+# Summaries and quizzes generated from a plain-text note.
+# These mirror the document endpoints so the Notes & PDFs page behaves the same
+# for typed notes and uploaded PDFs.
+# ---------------------------------------------------------------------------
+@router.post(
+    "/{note_id}/summary",
+    response_model=SummaryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def generate_note_summary(
+    note_id: int,
+    payload: SummaryGenerateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        return await insight_service.generate_summary(
+            db,
+            current_user.id,
+            note_id=note_id,
+            max_words=payload.max_words,
+            max_key_points=payload.max_key_points,
+        )
+    except Exception as error:  # mapped to a meaningful HTTP status
+        raise http_error(error) from error
+
+
+@router.get("/{note_id}/summary", response_model=SummaryResponse)
+async def get_note_summary(
+    note_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        summary = await insight_service.latest_summary(db, current_user.id, note_id=note_id)
+    except Exception as error:
+        raise http_error(error) from error
+    if summary is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No summary has been generated for this note yet.",
+        )
+    return summary
+
+
+@router.post(
+    "/{note_id}/quiz",
+    response_model=QuizResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def generate_note_quiz(
+    note_id: int,
+    payload: QuizGenerateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    try:
+        return await insight_service.generate_quiz(
+            db,
+            current_user.id,
+            note_id=note_id,
+            question_count=payload.question_count,
+        )
+    except Exception as error:
+        raise http_error(error) from error
+
+
+@router.get("/{note_id}/quizzes", response_model=list[QuizResponse])
+async def list_note_quizzes(
+    note_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(10, ge=1, le=50),
+):
+    try:
+        return await insight_service.list_quizzes(
+            db, current_user.id, note_id=note_id, limit=limit
+        )
+    except Exception as error:
+        raise http_error(error) from error
