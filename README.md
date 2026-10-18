@@ -8,7 +8,8 @@ StudyFlow is a lightweight AI-powered study companion designed for MCA/B.Tech co
 - **Backend API:** FastAPI (Python 3.11+), Pydantic v2
 - **ORM & Database:** SQLAlchemy 2.0 (Async), MySQL 8.0 / MariaDB
 - **Authentication & Security:** short-lived issuer-bound JWT access tokens, Argon2id password hashes (legacy bcrypt hashes are upgraded at login), and password-change session revocation
-- **Application Services:** Modular service layer (`AuthService`, `SemesterService`, `SubjectService`, `TopicService`, `ExamService`, `NoteService`, `PriorityEngine`, `StorageService`)
+- **PDF Intelligence:** PyMuPDF text extraction, an offline extractive summarizer, and offline multiple-choice quiz generation (no API keys, no model downloads, no paid services)
+- **Application Services:** Modular service layer (`AuthService`, `SemesterService`, `SubjectService`, `TopicService`, `ExamService`, `NoteService`, `DocumentService`, `InsightService`, `PriorityEngine`, `StorageService`)
 
 ```text
 React Frontend (Next.js)
@@ -19,9 +20,11 @@ Application Services
         ↓
 Rule-Based Priority Engine
         ↓
-MySQL Database (Users, Semesters, Subjects, Topics, Exams, Notes)
+MySQL Database (Users, Semesters, Subjects, Topics, Exams, Notes,
+                Documents, Summaries, Quizzes, Attempts)
         ↓
-File Storage (Uploads)
+File Storage (Uploaded PDFs) + Offline PDF Intelligence
+(PyMuPDF extraction → extractive summaries → generated quizzes)
 ```
 
 ## Database Setup (MySQL)
@@ -44,7 +47,13 @@ File Storage (Uploads)
    ACCESS_TOKEN_EXPIRE_MINUTES=60
    ```
    Generate a secret with `openssl rand -hex 32`. Never deploy the example or development secret.
-   Existing installations can rerun `mysql_setup.sql`; its idempotent table creation adds the Notes table.
+   Existing installations can rerun `mysql_setup.sql`; its idempotent table creation adds the Notes tables and the Phase 4 PDF Intelligence tables (`documents`, `document_summaries`, `quizzes`, `quiz_questions`, `quiz_attempts`, `quiz_attempt_answers`). No table is ever dropped and no existing row is modified.
+
+3. **Optional upload settings:**
+   ```env
+   UPLOAD_DIR=uploads
+   MAX_UPLOAD_SIZE_MB=20
+   ```
 
 ## Running the Application
 
@@ -81,6 +90,20 @@ docker compose up --build
 ```bash
 PYTHONPATH=apps/api pytest apps/api/tests -v
 ```
+
+### 5. Try the PDF workflow
+```bash
+# Create a real, text-based sample PDF
+.venv/bin/python apps/api/scripts/make_sample_pdf.py /tmp/sample.pdf
+
+# Or run the full end-to-end check against the running API + web app
+.venv/bin/python scripts/smoke_test.py
+```
+
+> The web app calls its own origin at `/api/v1`; Next.js proxies those requests to the
+> API (see `apps/web/next.config.ts`, override with `API_PROXY_TARGET`). Set
+> `NEXT_PUBLIC_API_URL` only if you want the browser to call the API directly, and add
+> that origin to `CORS_ORIGINS`.
 
 ## API Endpoints (v1)
 
@@ -119,9 +142,67 @@ PYTHONPATH=apps/api pytest apps/api/tests -v
 | **Notes** | `GET` | `/api/v1/notes/{id}` | Get a note |
 | **Notes** | `PUT` | `/api/v1/notes/{id}` | Update note content, links, tags, or pin state |
 | **Notes** | `DELETE` | `/api/v1/notes/{id}` | Delete a note |
+| **Notes** | `POST` | `/api/v1/notes/{id}/summary` | Generate a summary from a note |
+| **Notes** | `GET` | `/api/v1/notes/{id}/summary` | Latest summary for a note |
+| **Notes** | `POST` | `/api/v1/notes/{id}/quiz` | Generate a quiz from a note |
+| **Documents** | `POST` | `/api/v1/documents` | Upload a PDF (multipart) and extract its text |
+| **Documents** | `GET` | `/api/v1/documents` | List/search PDFs (`q`, `subject_id`, `semester_id`, `status`) |
+| **Documents** | `GET` | `/api/v1/documents/{id}` | Document details + summary/quiz counts |
+| **Documents** | `GET` | `/api/v1/documents/{id}/text` | Extracted text |
+| **Documents** | `POST` | `/api/v1/documents/{id}/reprocess` | Re-run extraction on a failed document |
+| **Documents** | `DELETE` | `/api/v1/documents/{id}` | Delete a document and its stored file |
+| **Documents** | `POST` | `/api/v1/documents/{id}/summary` | Generate/regenerate a summary |
+| **Documents** | `GET` | `/api/v1/documents/{id}/summary` | Latest summary |
+| **Documents** | `GET` | `/api/v1/documents/{id}/summaries` | Summary history |
+| **Documents** | `POST` | `/api/v1/documents/{id}/quiz` | Generate a quiz (`question_count`) |
+| **Documents** | `GET` | `/api/v1/documents/{id}/quizzes` | Saved quizzes for a document |
+| **Quizzes** | `GET` | `/api/v1/quizzes/{id}` | Quiz for taking (answers hidden) |
+| **Quizzes** | `POST` | `/api/v1/quizzes/{id}/attempts` | Submit answers and get the graded attempt |
+| **Quizzes** | `GET` | `/api/v1/quizzes/{id}/attempts/{attempt_id}` | One graded attempt |
+| **Quizzes** | `GET` | `/api/v1/quizzes/{id}/results` | Attempt history, best and average score |
+
+### PDFs, summaries, and quizzes
+
+A PDF upload is validated (extension, content type, magic bytes, size), stored under
+`UPLOAD_DIR/<user_id>/`, and processed with PyMuPDF into `documents`, whose
+`processing_status` is `pending`, `processing`, `completed`, or `failed`. A failed
+document keeps an `error_code` and a readable `error_message` (corrupt, empty, scanned
+without a text layer, password protected, or too little text) and is never marked
+completed; it can be reprocessed. Re-uploading byte-identical content is rejected with
+`409`.
+
+Summaries are extractive and generated locally: sentences are scored with a TF-IDF
+style heuristic inside sentence-boundary chunks, then rebuilt in reading order within
+the requested word budget, and saved so they survive a reload. Quizzes are built from
+definition-style sentences in the document: the term is blanked out, the distractors
+come from other terms in the same document, and every explanation quotes its source
+sentence. A passage that cannot support a reliable question is skipped instead of
+guessed. Correct answers stay hidden until an attempt is graded; attempts store each
+answer, the score, and a timestamp.
+
+Everything is scoped to its owner — another student gets `404`, not someone else's data.
 
 ### Notes and account security
 
 Notes are private to their owner and can be linked to one of their subjects and topics. They support plain-text content, up to 20 tags, pinning, server-side search across note text/tags/linked names, and pagination. Deleting a linked subject or topic keeps the note and clears the deleted reference.
 
 Registration and password changes require at least 12 characters including uppercase, lowercase, and a number. New passwords are hashed with Argon2id; legacy bcrypt hashes continue to verify and are upgraded after a successful login. Access tokens are issuer-bound, expire after 60 minutes by default, and are invalidated across existing sessions when the account password changes.
+
+
+## Sprint Mode (Phase 5)
+
+Open **Dashboard → Sprint Mode**, choose an upcoming exam, enter daily study minutes,
+and activate explicitly. Review the prioritized daily tasks, saved summaries and
+quizzes, track completion, change your budget, or pause/resume/finish/exit. Plans and
+completed work persist across reloads; low recent quiz scores are explainable signals,
+not automatic claims about mastery. No additional application dependency or AI key.
+
+Existing MySQL installations can apply the additive migration without resetting data:
+
+```bash
+mysql -u studyflow -p studyflow < apps/api/migrations/005_sprint_mode.sql
+PYTHONPATH=apps/api:apps/api/tests .venv/bin/python -m pytest apps/api/tests -q
+```
+
+See [Sprint implementation and acceptance report](docs/sprint-mode.md) for scheduling
+rules, files changed, API endpoints, exact run commands, test results and limitations.

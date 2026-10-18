@@ -30,7 +30,8 @@ services:
   web:
     build: ./apps/web
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      # The browser calls the Next.js origin, which proxies /api/v1 to the api service.
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:8000}
     depends_on:
       - api
     ports:

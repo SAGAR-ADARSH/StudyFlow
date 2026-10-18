@@ -2,16 +2,19 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
+  ClipboardList,
   FileText,
   Pin,
   Pencil,
   Plus,
   Search,
+  Sparkles,
   StickyNote,
   Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { QuizModal, SummaryModal } from "./insight-modals";
 import {
   createNote,
   deleteNote,
@@ -60,6 +63,13 @@ export function NotesPanel({ subjects, topics }: NotesPanelProps) {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [draft, setDraft] = useState<NoteDraft>(emptyDraft);
   const [formError, setFormError] = useState<string | null>(null);
+  const [insightNote, setInsightNote] = useState<Note | null>(null);
+  const [insightMode, setInsightMode] = useState<"summary" | "quiz">("summary");
+
+  function openInsight(note: Note, mode: "summary" | "quiz") {
+    setInsightNote(note);
+    setInsightMode(mode);
+  }
 
   const refreshNotes = useCallback(async () => {
     setLoading(true);
@@ -191,7 +201,10 @@ export function NotesPanel({ subjects, topics }: NotesPanelProps) {
           <h1 id="notes-heading" className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
             Notes <span className="text-slate-400">({hasMore ? `${notes.length}+` : notes.length})</span>
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Keep class notes, quick ideas, and revision points together.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Keep class notes, quick ideas, and revision points together — and turn any note into a
+            summary or a practice quiz.
+          </p>
         </div>
         <Button onClick={() => openEditor()} className="gap-2 self-start sm:self-auto">
           <Plus className="h-4 w-4" /> New note
@@ -296,6 +309,24 @@ export function NotesPanel({ subjects, topics }: NotesPanelProps) {
                   Updated {new Date(note.updated_at || note.created_at).toLocaleDateString()}
                 </time>
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openInsight(note, "summary")}
+                    aria-label={`Summarize ${note.title}`}
+                    title="Generate or view a summary"
+                    className="rounded-lg p-2 text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openInsight(note, "quiz")}
+                    aria-label={`Quiz on ${note.title}`}
+                    title="Generate or take a quiz"
+                    className="rounded-lg p-2 text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => openEditor(note)}
@@ -447,6 +478,20 @@ export function NotesPanel({ subjects, topics }: NotesPanelProps) {
             </form>
           </section>
         </div>
+      )}
+      {insightNote && insightMode === "summary" && (
+        <SummaryModal
+          source={{ kind: "note", id: insightNote.id }}
+          sourceTitle={insightNote.title}
+          onClose={() => setInsightNote(null)}
+        />
+      )}
+      {insightNote && insightMode === "quiz" && (
+        <QuizModal
+          source={{ kind: "note", id: insightNote.id }}
+          sourceTitle={insightNote.title}
+          onClose={() => setInsightNote(null)}
+        />
       )}
     </section>
   );

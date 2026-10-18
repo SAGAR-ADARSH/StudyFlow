@@ -1,6 +1,9 @@
 // StudyFlow API Client Library
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Relative by default so the browser only ever talks to its own origin; the Next.js
+// server proxies /api/v1 to the FastAPI backend (see next.config.ts). Set
+// NEXT_PUBLIC_API_URL to call the API directly instead.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export interface User {
   id: number;
@@ -128,6 +131,13 @@ export function clearToken(): void {
   }
 }
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 // Generic Authenticated Fetch Helper
 async function request<T>(
   endpoint: string,
@@ -140,7 +150,10 @@ async function request<T>(
   };
 
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    // Direct API deployments use Bearer; same-origin requests use a header
+    // that hosted preview gateways do not consume. Our route translates it.
+    if (API_BASE.startsWith("/")) headers["X-StudyFlow-Token"] = token;
+    else headers["Authorization"] = `Bearer ${token}`;
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -155,11 +168,52 @@ async function request<T>(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const errorMsg = data.detail || `Request failed with status ${response.status}`;
-    throw new Error(typeof errorMsg === "string" ? errorMsg : JSON.stringify(errorMsg));
+    throw new ApiError(extractErrorMessage(data, response.status), response.status);
   }
 
   return data as T;
+}
+
+// Multipart uploads must not force a JSON content type, so they get their own helper.
+async function requestForm<T>(endpoint: string, body: FormData): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    // Direct API deployments use Bearer; same-origin requests use a header
+    // that hosted preview gateways do not consume. Our route translates it.
+    if (API_BASE.startsWith("/")) headers["X-StudyFlow-Token"] = token;
+    else headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new ApiError(extractErrorMessage(data, response.status), response.status);
+  }
+  return data as T;
+}
+
+function extractErrorMessage(data: unknown, status: number): string {
+  if (data && typeof data === "object") {
+    const detail = (data as { detail?: unknown }).detail;
+    if (typeof detail === "string") return detail;
+    if (detail && typeof detail === "object") {
+      const message = (detail as { message?: unknown }).message;
+      if (typeof message === "string") return message;
+      const code = (detail as { code?: unknown }).code;
+      if (typeof code === "string") return code;
+    }
+    if (Array.isArray(detail) && detail.length > 0) {
+      const first = detail[0] as { msg?: unknown };
+      if (typeof first?.msg === "string") return first.msg;
+    }
+  }
+  return `Request failed with status ${status}`;
 }
 
 // ----------------------------------------------------------------------
@@ -531,3 +585,273 @@ export async function deleteNote(id: number): Promise<void> {
     method: "DELETE",
   });
 }
+
+// ----------------------------------------------------------------------
+// Documents (PDF uploads), summaries, and quizzes
+// ----------------------------------------------------------------------
+export type DocumentProcessingStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface StudyDocument {
+  id: number;
+  user_id: number;
+  semester_id: number | null;
+  subject_id: number | null;
+  title: string;
+  original_filename: string;
+  file_size_bytes: number;
+  page_count: number;
+  processing_status: DocumentProcessingStatus;
+  extracted_chars: number;
+  word_count: number;
+  text_truncated: boolean;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at?: string | null;
+  subject_name?: string | null;
+  semester_name?: string | null;
+  summary_count: number;
+  latest_summary_id: number | null;
+  summary_updated_at?: string | null;
+  quiz_count: number;
+  latest_quiz_id: number | null;
+}
+
+export interface DocumentListResult {
+  items: StudyDocument[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface DocumentText {
+  document_id: number;
+  title: string;
+  processing_status: DocumentProcessingStatus;
+  page_count: number;
+  extracted_chars: number;
+  text_truncated: boolean;
+  text: string | null;
+}
+
+export interface DocumentSummary {
+  id: number;
+  user_id: number;
+  document_id: number | null;
+  note_id: number | null;
+  method: string;
+  engine_version: string;
+  summary_text: string;
+  key_points: string[];
+  source_chars: number;
+  source_sentences: number;
+  chunk_count: number;
+  word_count: number;
+  created_at: string;
+  source_title?: string | null;
+  warnings: string[];
+}
+
+export interface QuizQuestion {
+  id: number;
+  order_index: number;
+  question_type: string;
+  prompt: string;
+  options: string[];
+  source_page?: number | null;
+}
+
+export interface Quiz {
+  id: number;
+  user_id: number;
+  document_id: number | null;
+  note_id: number | null;
+  semester_id: number | null;
+  subject_id: number | null;
+  title: string;
+  method: string;
+  engine_version: string;
+  requested_count: number;
+  question_count: number;
+  source_chars: number;
+  created_at: string;
+  questions: QuizQuestion[];
+  subject_name?: string | null;
+  semester_name?: string | null;
+  document_title?: string | null;
+  attempt_count: number;
+  best_score_percent: number | null;
+  warnings: string[];
+}
+
+export interface AttemptAnswerDetail {
+  question_id: number;
+  order_index: number;
+  prompt: string;
+  options: string[];
+  selected_index: number | null;
+  correct_index: number;
+  is_correct: boolean;
+  explanation: string;
+  source_excerpt?: string | null;
+  source_page?: number | null;
+}
+
+export interface QuizAttempt {
+  id: number;
+  quiz_id: number;
+  user_id: number;
+  total_questions: number;
+  correct_count: number;
+  score_percent: number;
+  duration_seconds: number | null;
+  submitted_at: string;
+  answers: AttemptAnswerDetail[];
+}
+
+export interface QuizResults {
+  quiz: Quiz;
+  attempts: QuizAttempt[];
+  best_score_percent: number | null;
+  average_score_percent: number | null;
+}
+
+export type InsightSource =
+  | { kind: "document"; id: number }
+  | { kind: "note"; id: number };
+
+function insightPath(source: InsightSource): string {
+  return source.kind === "document" ? `/documents/${source.id}` : `/notes/${source.id}`;
+}
+
+export async function getDocuments(params?: {
+  q?: string;
+  subject_id?: number;
+  semester_id?: number;
+  status?: DocumentProcessingStatus;
+  limit?: number;
+  offset?: number;
+}): Promise<DocumentListResult> {
+  const queryParams = new URLSearchParams();
+  if (params?.q) queryParams.append("q", params.q);
+  if (params?.subject_id) queryParams.append("subject_id", params.subject_id.toString());
+  if (params?.semester_id) queryParams.append("semester_id", params.semester_id.toString());
+  if (params?.status) queryParams.append("status", params.status);
+  if (params?.limit) queryParams.append("limit", params.limit.toString());
+  if (params?.offset) queryParams.append("offset", params.offset.toString());
+  const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
+  return request<DocumentListResult>(`/documents${query}`);
+}
+
+export async function uploadDocument(payload: {
+  file: File;
+  title?: string;
+  subject_id?: number | null;
+  semester_id?: number | null;
+}): Promise<StudyDocument> {
+  const form = new FormData();
+  form.append("file", payload.file);
+  if (payload.title?.trim()) form.append("title", payload.title.trim());
+  if (payload.subject_id) form.append("subject_id", payload.subject_id.toString());
+  if (payload.semester_id) form.append("semester_id", payload.semester_id.toString());
+  return requestForm<StudyDocument>("/documents", form);
+}
+
+export async function getDocumentText(id: number): Promise<DocumentText> {
+  return request<DocumentText>(`/documents/${id}/text`);
+}
+
+export async function reprocessDocument(id: number): Promise<StudyDocument> {
+  return request<StudyDocument>(`/documents/${id}/reprocess`, { method: "POST" });
+}
+
+export async function deleteDocument(id: number): Promise<void> {
+  return request<void>(`/documents/${id}`, { method: "DELETE" });
+}
+
+export async function generateSummary(
+  source: InsightSource,
+  payload: { max_words?: number; max_key_points?: number } = {}
+): Promise<DocumentSummary> {
+  return request<DocumentSummary>(`${insightPath(source)}/summary`, {
+    method: "POST",
+    body: JSON.stringify({
+      max_words: payload.max_words ?? 220,
+      max_key_points: payload.max_key_points ?? 6,
+      regenerate: true,
+    }),
+  });
+}
+
+export async function getSummary(source: InsightSource): Promise<DocumentSummary> {
+  return request<DocumentSummary>(`${insightPath(source)}/summary`);
+}
+
+export async function generateQuiz(
+  source: InsightSource,
+  questionCount: number
+): Promise<Quiz> {
+  return request<Quiz>(`${insightPath(source)}/quiz`, {
+    method: "POST",
+    body: JSON.stringify({ question_count: questionCount }),
+  });
+}
+
+export async function listQuizzes(source: InsightSource): Promise<Quiz[]> {
+  return request<Quiz[]>(`${insightPath(source)}/quizzes`);
+}
+
+export async function getQuiz(quizId: number): Promise<Quiz> {
+  return request<Quiz>(`/quizzes/${quizId}`);
+}
+
+export async function submitQuizAttempt(
+  quizId: number,
+  answers: { question_id: number; selected_index: number | null }[],
+  durationSeconds?: number
+): Promise<QuizAttempt> {
+  return request<QuizAttempt>(`/quizzes/${quizId}/attempts`, {
+    method: "POST",
+    body: JSON.stringify({ answers, duration_seconds: durationSeconds ?? null }),
+  });
+}
+
+export async function getQuizResults(quizId: number): Promise<QuizResults> {
+  return request<QuizResults>(`/quizzes/${quizId}/results`);
+}
+
+// Sprint Mode uses existing academic records and insight endpoints.
+export interface SprintTopic {
+  id: number; name: string; status: string; score: number; weak: boolean;
+  reason: string; estimated_minutes: number; remaining_minutes?: number;
+}
+export interface SprintResource {
+  kind: "document" | "note"; id: number; title: string; topic_id: number | null;
+  has_summary: boolean; content?: string;
+}
+export interface SprintTask {
+  id: number; topic_id: number | null; kind: string; title: string;
+  minutes: number; priority: number; reason: string; completed: boolean;
+}
+export interface SprintPlan {
+  id: number; exam_id: number; status: "active" | "paused" | "completed" | "cancelled";
+  daily_minutes: number; timezone: string; exam_title: string; exam_date: string;
+  subject_name: string; days_remaining: number; plan_date: string; budget_minutes: number;
+  tasks: SprintTask[]; completed_today: number; remaining_minutes: number;
+  topics_completed: number; topics_total: number; revision_topics: SprintTopic[];
+  pending_topics: SprintTopic[]; progress_percent: number; completed_tasks: number; total_tasks: number;
+  resources: SprintResource[]; quizzes: { id: number; title: string; document_id: number | null; note_id: number | null }[];
+  quiz_average: number | null; quiz_attempt_count: number; warnings: string[];
+}
+export interface SprintRecommendation { exam_id: number; title: string; days_remaining: number; reason: string }
+export const getSprints = () => request<SprintPlan[]>("/sprints");
+export const getSprintRecommendations = () => request<SprintRecommendation[]>(`/sprints/recommendations?timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`);
+export const getSprintPlan = (id: number) => request<SprintPlan>(`/sprints/${id}/daily-plan`);
+export const createSprint = (exam_id: number, daily_minutes: number, timezone: string) =>
+  request<SprintPlan>("/sprints", { method: "POST", body: JSON.stringify({ exam_id, daily_minutes, timezone }) });
+export const recalculateSprint = (id: number, daily_minutes?: number) =>
+  request<SprintPlan>(`/sprints/${id}/recalculate`, { method: "POST", body: JSON.stringify({ daily_minutes }) });
+export const updateSprintTask = (id: number, taskId: number, completed: boolean, mark_topic_completed = false) =>
+  request<SprintPlan>(`/sprints/${id}/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ completed, mark_topic_completed }) });
+export const setSprintStatus = (id: number, status: SprintPlan["status"]) =>
+  request<SprintPlan>(`/sprints/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });

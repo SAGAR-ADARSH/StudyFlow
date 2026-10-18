@@ -29,6 +29,12 @@ class Settings(BaseSettings):
 
     # File Storage Configuration
     upload_dir: str = "uploads"
+    # Largest accepted PDF upload, in megabytes.
+    max_upload_size_mb: int = Field(default=20, gt=0, le=200)
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
 
     @field_validator("jwt_secret_key")
     @classmethod
