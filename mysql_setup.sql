@@ -333,3 +333,93 @@ CREATE TABLE IF NOT EXISTS `sprint_tasks` (
 	FOREIGN KEY(day_id) REFERENCES sprint_days (id) ON DELETE CASCADE,
 	FOREIGN KEY(topic_id) REFERENCES topics (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- ==========================================================
+-- Phase 6: General Tasks, Flashcards, Study Sessions
+-- Additive and idempotent — preserves all existing data.
+-- ==========================================================
+
+-- ----------------------------------------------------------
+-- 16. Study tasks (standalone planner, distinct from Sprint tasks)
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `study_tasks` (
+  `content_key` VARCHAR(64) NOT NULL,
+  UNIQUE KEY `uq_task_content` (`user_id`, `content_key`),
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `subject_id` INT DEFAULT NULL,
+  `topic_id` INT DEFAULT NULL,
+  `exam_id` INT DEFAULT NULL,
+  `title` VARCHAR(180) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `due_date` DATE DEFAULT NULL,
+  `estimated_minutes` INT DEFAULT NULL,
+  `priority` VARCHAR(20) NOT NULL DEFAULT 'Medium',
+  `status` VARCHAR(30) NOT NULL DEFAULT 'Pending',
+  `completed_at` DATETIME DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_study_tasks_user` (`user_id`),
+  INDEX `idx_study_tasks_subject` (`subject_id`),
+  INDEX `idx_study_tasks_topic` (`topic_id`),
+  INDEX `idx_study_tasks_exam` (`exam_id`),
+  INDEX `idx_study_tasks_status` (`status`),
+  INDEX `idx_study_tasks_due` (`due_date`),
+  CONSTRAINT `fk_study_tasks_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_study_tasks_subject` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_study_tasks_topic` FOREIGN KEY (`topic_id`) REFERENCES `topics` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_study_tasks_exam` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 17. Flashcards
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `flashcards` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `subject_id` INT DEFAULT NULL,
+  `topic_id` INT DEFAULT NULL,
+  `front` TEXT NOT NULL,
+  `back` TEXT NOT NULL,
+  `review_status` VARCHAR(20) NOT NULL DEFAULT 'needs_revision',
+  `is_generated` TINYINT(1) NOT NULL DEFAULT 0,
+  `source_type` VARCHAR(20) DEFAULT NULL,
+  `source_id` INT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `last_reviewed_at` DATETIME DEFAULT NULL,
+  INDEX `idx_flashcards_user` (`user_id`),
+  INDEX `idx_flashcards_subject` (`subject_id`),
+  INDEX `idx_flashcards_topic` (`topic_id`),
+  INDEX `idx_flashcards_review` (`review_status`),
+  CONSTRAINT `fk_flashcards_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_flashcards_subject` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_flashcards_topic` FOREIGN KEY (`topic_id`) REFERENCES `topics` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 18. Study sessions (time tracking)
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `study_sessions` (
+  `active_slot` INT DEFAULT 1,
+  `version` INT NOT NULL DEFAULT 1,
+  UNIQUE KEY `uq_session_open` (`user_id`, `active_slot`),
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `subject_id` INT DEFAULT NULL,
+  `topic_id` INT DEFAULT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+  `started_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `paused_at` DATETIME DEFAULT NULL,
+  `accumulated_seconds` INT NOT NULL DEFAULT 0,
+  `duration_seconds` INT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_study_sessions_user` (`user_id`),
+  INDEX `idx_study_sessions_subject` (`subject_id`),
+  INDEX `idx_study_sessions_status` (`status`),
+  CONSTRAINT `fk_study_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_study_sessions_subject` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_study_sessions_topic` FOREIGN KEY (`topic_id`) REFERENCES `topics` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

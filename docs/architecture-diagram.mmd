@@ -1,0 +1,24 @@
+flowchart TD
+  Browser["Next.js App Router / React 19 / Tailwind<br/>Landing • Login • Dashboard panels"]
+  Client["lib/api.ts<br/>JWT in localStorage; app token header"]
+  Proxy["Next.js app/api/v1/[...path]/route.ts<br/>same-origin proxy → Bearer token"]
+  API["FastAPI main.py /api/v1<br/>Pydantic validation + get_current_user ownership"]
+  Academic["Auth / User / Semester / Subject / Topic / Exam / Note services"]
+  Tools["TaskService / FlashcardService / StudySessionService"]
+  Sprint["Sprint service<br/>daily budgets + stable tasks + saved completions"]
+  Priority["PriorityEngine<br/>importance + stepped urgency (not ML)"]
+  PDF["DocumentService → StorageService<br/>PyMuPDF text extraction in worker thread"]
+  Insights["InsightService<br/>extractive summaries + source-grounded quizzes"]
+  Analytics["AnalyticsService<br/>record-derived completion, attempts, exams, time, tasks, cards"]
+  SQL["SQLAlchemy 2 async → MySQL<br/>18 tables (see architecture.md)"]
+  Files["Local UPLOAD_DIR/user_id/PDF files"]
+  Future["Deferred: local OCR, spaced repetition,<br/>notifications, predictive models"]
+  Browser --> Client --> Proxy --> API
+  API --> Academic & Tools & Sprint & PDF & Insights & Analytics
+  Sprint --> Priority
+  Tools --> Priority
+  Tools --> Parser["Existing quiz_engine definition parser<br/>optional grounded flashcards"]
+  PDF --> Files
+  PDF -->|saved source text| Insights
+  Academic & Tools & Sprint & PDF & Insights & Analytics --> SQL
+  Future -.- PDF

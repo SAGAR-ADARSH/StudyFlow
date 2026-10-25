@@ -238,7 +238,7 @@ export function DocumentsPanel({ subjects }: DocumentsPanelProps) {
               className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none file:mr-3 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-indigo-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
             <p className="mt-1 text-[10px] text-slate-400">
-              Text-based PDFs only, up to {MAX_UPLOAD_MB} MB. Scanned files need OCR first.
+              Text-based PDFs only, up to {MAX_UPLOAD_MB} MB. Scanned/image-only PDFs are detected but OCR is not implemented — export a text-based PDF or add a text layer with a local OCR tool (OCRmyPDF with Tesseract) then re-upload. OCR is a planned future enhancement.
             </p>
           </div>
           <div>
@@ -399,9 +399,12 @@ export function DocumentsPanel({ subjects }: DocumentsPanelProps) {
                 </dl>
 
                 {document.error_message && (
-                  <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] leading-5 text-rose-700">
-                    {document.error_message}
-                  </p>
+                  <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] leading-5 text-rose-700">
+                    <p>{document.error_message}</p>
+                    {document.error_code === "scanned_pdf" && (
+                      <p className="mt-1 text-[10px] text-rose-600">Tip: StudyFlow keeps failed files for you to fix and retry — it never marks a scanned PDF as “completed.” Re-export the lecture slides from PowerPoint/Google Docs as PDF, or run OCRmyPDF locally to add a text layer, then upload the converted file. Retry reprocesses the original stored bytes.</p>
+                    )}
+                  </div>
                 )}
 
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">

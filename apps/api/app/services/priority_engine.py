@@ -1,12 +1,8 @@
-"""
-Rule-Based Priority Engine (Scaffolding for Milestone Phase 2)
+"""Explainable topic score: importance × 10 plus stepped exam urgency.
 
-This engine calculates study priority for topics and subjects based on:
-1. Days remaining until exam
-2. Topic completion status and estimated study hours
-3. Importance score (1-5) and user difficulty rating
+Completed topics score zero. Sprint scheduling adds its documented adjustments;
+no trained prediction model or automatic mastery diagnosis is involved.
 """
-from datetime import date
 from typing import Optional
 
 
@@ -20,7 +16,7 @@ class PriorityEngine:
         """
         Lightweight heuristic:
         - If completed, priority score is 0.
-        - Closer exam dates scale urgency up exponentially.
+        - Closer exam dates add stepped urgency bonuses.
         - Higher importance increases baseline weight.
         """
         if is_completed:

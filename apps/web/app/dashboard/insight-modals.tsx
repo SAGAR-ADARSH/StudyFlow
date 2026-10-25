@@ -455,8 +455,9 @@ export function QuizModal({
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">New quiz</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Questions are built from the definitions and statements inside this document. Passages
-              without a clear fact are skipped instead of guessed.
+              Questions use definitions and quoted factual passages from this material. Answer choices
+              come from the same source. Diagram-only content and program code are skipped;
+              fewer questions may be returned when there is not enough readable explanation.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {QUESTION_COUNTS.map((count) => (
