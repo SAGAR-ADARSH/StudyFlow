@@ -1,5 +1,9 @@
 # StudyFlow — Complete Project and Feature Summary
 
+> Updated implementation: [architecture](architecture.md) and [2026-10-18 enhancement
+> report](enhancement-report.md) are the current technical references. Historical test
+> counts below are explicitly prior phase results.
+
 ## 1. What is StudyFlow?
 
 StudyFlow is a web-based study organizer and exam-preparation companion for college
@@ -178,8 +182,10 @@ No paid service, API key, or large model download is required.
 
 **Purpose:** Practice recall using the actual uploaded or written material.
 
-The existing quiz generator finds definition-style facts, then creates cloze or
-term/definition multiple-choice questions. Distractors come from other relevant terms
+The quiz generator finds definition-style facts, handles numbered bullets and
+wrapped slide lines, then creates cloze or term/definition multiple-choice questions.
+When definitions are sparse, it can complete quoted factual passages using answer
+choices from the same document. It skips code and diagram-only content. Distractors come from other relevant terms
 in the same source. Explanations quote source text; page references are included where
 available. Unreliable candidates are skipped rather than replaced with invented facts.
 
@@ -291,7 +297,7 @@ replace ordinary notes, PDF study, or academic management.
 | Security | JWT access tokens, Argon2id hashing, ownership-scoped queries |
 | File storage | Server-side uploaded PDFs; metadata/text in the database |
 
-The database currently has 15 modeled tables: users, semesters, subjects, topics,
+Before the study-tools enhancement, the database had 15 modeled tables: users, semesters, subjects, topics,
 exams, notes, documents, document_summaries, quizzes, quiz_questions, quiz_attempts,
 quiz_attempt_answers, sprints, sprint_days, and sprint_tasks.
 
@@ -322,7 +328,8 @@ allows pending work to be recalculated without removing completed work.
 | Sprint activation, daily plans, adaptation and controls | Implemented; core browser workflow verified during the Sprint phase |
 | Additive MySQL schema and Sprint migration | Documented/schema-guarded; real MySQL runtime verification outstanding in this environment |
 | OCR for scanned PDFs | Not implemented |
-| Flashcards, conversational AI tutor, advanced analytics | Not implemented as current features |
+| Standalone tasks, flashcards, study timer, basic combined analytics | Implemented by the study-tools enhancement; see enhancement report |
+| Conversational AI tutor, predictive/advanced analytics | Deferred |
 | Automatic background exam notifications or calendar sync | Not implemented |
 | Automatic syllabus extraction/topic mastery diagnosis from PDFs | Not implemented |
 
@@ -343,3 +350,25 @@ Mode combines exam urgency, topic priorities, learning-progress signals and the 
 daily time budget into an explainable, persistent study plan. All student data is protected
 by authentication and ownership checks, and the core study features work without paid AI
 APIs or large mandatory model downloads.
+
+
+## 8. Study-tools enhancement (2026-10-18)
+
+The implementation now adds independent study tasks (not Sprint tasks), subject-linked
+flashcards with flip/known/revision review, an optional manual-start study timer with
+persisted backend timing, and combined basic analytics. Dashboard overview includes open
+and overdue general tasks and separately labeled estimated and recorded time.
+
+Three additive tables bring the modeled total to **18**: `study_tasks`, `flashcards`,
+`study_sessions`. Existing modules, MySQL configuration, JWT mechanism, UI components,
+summary/quiz engines and Sprint progress are retained. Optional flashcard generation
+reuses the existing definition parser and is explicitly rule-based.
+
+Timer time is recorded only on completion; paused time is excluded. A timer left active
+continues across reloads until paused, finished or cancelled. Topic completed hours can
+be copied from estimates when marking completion and are not automatically measured.
+New analytics never treats a past exam date alone as Completed or cancelled exams as
+upcoming. All metric meanings, new endpoints, migration commands and actual verification
+results are in [the enhancement report](enhancement-report.md) and README.
+
+OCR, spaced repetition, external notifications and predictive models remain deferred.

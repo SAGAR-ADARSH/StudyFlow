@@ -124,12 +124,15 @@ def extract_pdf_text(data: bytes) -> ExtractionResult:
         if has_images:
             raise PdfProcessingError(
                 "scanned_pdf",
-                "This looks like a scanned PDF with no selectable text. Run OCR on it "
-                "or upload a text-based version.",
+                "This looks like a scanned/image-only PDF with no selectable text layer. "
+                "StudyFlow extracts text directly; OCR is not installed. "
+                "To use this material: (1) export a text-based PDF from Word/Google Docs, or (2) run a local OCR tool "
+                "(e.g., open-source OCRmyPDF with Tesseract) to add a text layer, then re-upload.",
             )
         raise PdfProcessingError(
             "empty_document",
-            "No text could be extracted from this PDF.",
+            "No text could be extracted from this PDF. The file may contain only images or be blank. "
+            "Try exporting a text-based version or using a local OCR tool to add a text layer.",
         )
     if char_count < MIN_EXTRACTED_CHARS:
         raise PdfProcessingError(

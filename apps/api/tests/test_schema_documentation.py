@@ -43,10 +43,16 @@ def test_new_phase_tables_are_additive_and_cascade_to_their_owner():
     assert "DROP TABLE" not in sql, "the documented schema must never drop existing tables"
 
 
-def test_sprint_migration_is_additive_and_matches_setup_schema():
+def test_migrations_are_additive_and_match_setup_schema():
     sql = SCHEMA_FILES[0].read_text()
-    migration = (REPO_ROOT / "apps/api/migrations/005_sprint_mode.sql").read_text()
-    assert migration == sql[sql.index("-- Phase 5:"):]
-    assert "DROP " not in migration and "ALTER " not in migration
-    for table in ("sprints", "sprint_days", "sprint_tasks"):
-        assert "ON DELETE CASCADE" in _table_block(migration, table)
+    for filename, tables in {
+        "005_sprint_mode.sql": ["sprints", "sprint_days", "sprint_tasks"],
+        "006_study_tasks.sql": ["study_tasks"],
+        "007_flashcards.sql": ["flashcards"],
+        "008_study_sessions.sql": ["study_sessions"],
+    }.items():
+        migration = (REPO_ROOT / "apps/api/migrations" / filename).read_text()
+        assert "DROP " not in migration and "ALTER " not in migration
+        for table in tables:
+            assert _table_block(migration, table) == _table_block(sql, table)
+            assert "ON DELETE CASCADE" in _table_block(migration, table)

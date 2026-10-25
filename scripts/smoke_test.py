@@ -52,7 +52,7 @@ def main() -> int:
             f"{BASE}/auth/register",
             json={"email": owner_email, "password": PASSWORD, "display_name": "Smoke Owner"},
         )
-        check("register owner", register.status_code == 201, register.text[:80])
+        check("register owner", register.status_code == 201, f"HTTP {register.status_code}")
         owner = {"Authorization": f"Bearer {register.json()['access_token']}"}
 
         semester = client.post(

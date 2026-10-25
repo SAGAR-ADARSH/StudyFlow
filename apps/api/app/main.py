@@ -4,6 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.api.routes.analytics import router as analytics_router
+from app.api.routes.flashcards import router as flashcards_router
 from app.api.routes.sprints import router as sprints_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.documents import router as documents_router
@@ -11,7 +13,9 @@ from app.api.routes.exams import router as exams_router
 from app.api.routes.notes import router as notes_router
 from app.api.routes.quizzes import router as quizzes_router
 from app.api.routes.semesters import router as semesters_router
+from app.api.routes.study_sessions import router as study_sessions_router
 from app.api.routes.subjects import router as subjects_router
+from app.api.routes.tasks import router as tasks_router
 from app.api.routes.topics import router as topics_router
 from app.api.routes.users import router as users_router
 from app.core.config import get_settings
@@ -59,6 +63,10 @@ app.include_router(notes_router, prefix=api_v1_prefix)
 app.include_router(documents_router, prefix=api_v1_prefix)
 app.include_router(quizzes_router, prefix=api_v1_prefix)
 app.include_router(sprints_router, prefix=api_v1_prefix)
+app.include_router(tasks_router, prefix=api_v1_prefix)
+app.include_router(flashcards_router, prefix=api_v1_prefix)
+app.include_router(study_sessions_router, prefix=api_v1_prefix)
+app.include_router(analytics_router, prefix=api_v1_prefix)
 
 
 @app.get("/health", tags=["System"])

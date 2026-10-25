@@ -1,6 +1,6 @@
 # StudyFlow
 
-StudyFlow is a lightweight AI-powered study companion designed for MCA/B.Tech college students to organize semesters, subjects, syllabus topics, exam schedules, and personal study notes.
+StudyFlow is a lightweight, rule-based study companion designed for MCA/B.Tech college students to organize semesters, subjects, syllabus topics, exam schedules, and personal study notes.
 
 ## Stack & Architecture
 
@@ -12,20 +12,20 @@ StudyFlow is a lightweight AI-powered study companion designed for MCA/B.Tech co
 - **Application Services:** Modular service layer (`AuthService`, `SemesterService`, `SubjectService`, `TopicService`, `ExamService`, `NoteService`, `DocumentService`, `InsightService`, `PriorityEngine`, `StorageService`)
 
 ```text
-React Frontend (Next.js)
-        ↓
-FastAPI Backend API (/api/v1)
-        ↓
-Application Services
-        ↓
-Rule-Based Priority Engine
-        ↓
-MySQL Database (Users, Semesters, Subjects, Topics, Exams, Notes,
-                Documents, Summaries, Quizzes, Attempts)
-        ↓
-File Storage (Uploaded PDFs) + Offline PDF Intelligence
-(PyMuPDF extraction → extractive summaries → generated quizzes)
+Next.js dashboard → typed API client → same-origin Next.js proxy
+  → FastAPI /api/v1 (JWT + ownership checks)
+    → Academic / Notes / Documents / Insights / Sprint services
+    → Standalone Tasks / Flashcards / Study Sessions / Analytics
+      → SQLAlchemy async → MySQL (18 tables)
+Documents → local PDF storage + PyMuPDF text extraction
+Insights → local extractive summaries + grounded quizzes
+Sprint + task scores → explainable PriorityEngine (not ML)
 ```
+
+See [current architecture and diagram](docs/architecture.md),
+[initial feature audit](AUDIT_REPORT.md), and
+[enhancement verification report / final matrix](docs/enhancement-report.md).
+
 
 ## Database Setup (MySQL)
 
@@ -47,7 +47,7 @@ File Storage (Uploaded PDFs) + Offline PDF Intelligence
    ACCESS_TOKEN_EXPIRE_MINUTES=60
    ```
    Generate a secret with `openssl rand -hex 32`. Never deploy the example or development secret.
-   Existing installations can rerun `mysql_setup.sql`; its idempotent table creation adds the Notes tables and the Phase 4 PDF Intelligence tables (`documents`, `document_summaries`, `quizzes`, `quiz_questions`, `quiz_attempts`, `quiz_attempt_answers`). No table is ever dropped and no existing row is modified.
+   Existing installations can apply the numbered additive migrations below or rerun `mysql_setup.sql` to create missing tables. Neither drops tables nor modifies existing rows. `CREATE TABLE IF NOT EXISTS` and startup `create_all` do not alter an existing table or fix schema drift.
 
 3. **Optional upload settings:**
    ```env
@@ -76,15 +76,21 @@ API Health Check: [http://localhost:8000/health](http://localhost:8000/health)
 ### 2. Run Frontend (Next.js)
 ```bash
 cd apps/web
-npm install
-npm run dev
+npm ci
+npm run dev -- --hostname 0.0.0.0
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### 3. Run with Docker Compose
+Set `DATABASE_URL` in `.env` to use host **db**, not localhost, for the API container:
+`mysql+aiomysql://studyflow:<your-password>@db:3306/studyflow`.
+Set unique MySQL/JWT secrets first; do not deploy example passwords.
 ```bash
 docker compose up --build
 ```
+Compose persists MySQL, but the existing API container has no upload volume. Mount a
+persistent volume at the configured `UPLOAD_DIR` before relying on PDFs surviving API
+container replacement. Back up both the database and uploads.
 
 ### 4. Run Backend Automated Tests
 ```bash
@@ -98,10 +104,11 @@ PYTHONPATH=apps/api pytest apps/api/tests -v
 
 # Or run the full end-to-end check against the running API + web app
 .venv/bin/python scripts/smoke_test.py
+python scripts/smoke_study_tools.py
 ```
 
 > The web app calls its own origin at `/api/v1`; Next.js proxies those requests to the
-> API (see `apps/web/next.config.ts`, override with `API_PROXY_TARGET`). Set
+> API (see `apps/web/app/api/v1/[...path]/route.ts`, override with `API_PROXY_TARGET`). Set
 > `NEXT_PUBLIC_API_URL` only if you want the browser to call the API directly, and add
 > that origin to `CORS_ORIGINS`.
 
@@ -174,10 +181,13 @@ completed; it can be reprocessed. Re-uploading byte-identical content is rejecte
 Summaries are extractive and generated locally: sentences are scored with a TF-IDF
 style heuristic inside sentence-boundary chunks, then rebuilt in reading order within
 the requested word budget, and saved so they survive a reload. Quizzes are built from
-definition-style sentences in the document: the term is blanked out, the distractors
-come from other terms in the same document, and every explanation quotes its source
-sentence. A passage that cannot support a reliable question is skipped instead of
-guessed. Correct answers stay hidden until an attempt is graded; attempts store each
+definition-style sentences and quoted factual passages in the document. Numbered
+bullets, wrapped PDF lines, Unicode-hyphenated terms and descriptive labels are
+supported. Answer choices come from definitions, named headings or readable prose
+in that same source; code and diagram-only content are not interpreted. Every
+explanation quotes its source with a page reference when available. A passage that
+cannot support at least three distinct choices is skipped instead of guessed;
+the generator returns fewer than requested questions with a warning when necessary. Correct answers stay hidden until an attempt is graded; attempts store each
 answer, the score, and a timestamp.
 
 Everything is scoped to its owner — another student gets `404`, not someone else's data.
@@ -206,3 +216,101 @@ PYTHONPATH=apps/api:apps/api/tests .venv/bin/python -m pytest apps/api/tests -q
 
 See [Sprint implementation and acceptance report](docs/sprint-mode.md) for scheduling
 rules, files changed, API endpoints, exact run commands, test results and limitations.
+
+
+## Study tools enhancement
+
+Open **Dashboard → Tasks / Flashcards / Study Timer / Analytics**. Existing Notes/PDFs,
+academic management and Sprint Mode remain available unchanged.
+
+- **Tasks:** independent CRUD planner, subject/topic/exam linking, title/description,
+  optional due date and 1–1440 minute estimate, High/Medium/Low priority and
+  Pending/In Progress/Completed/Cancelled status. Status/priority/due-date filters,
+  overdue reminders and explainable due-date priority scores. Exact duplicate task
+  content/context is rejected with 409 (even when status/priority differs); edit the
+  existing row, or change its due date/title for a distinct study block.
+- **Flashcards:** subject required on creation; topic optional. Front/back CRUD,
+  flip review (keyboard or click), known/needs-revision filters and persistent state.
+  Optional note/PDF generation uses the existing definition parser, not generative AI.
+  Generated cards are labeled; repeated source/front generation reuses saved cards.
+- **Study Timer:** subject required; optional topic. Start, pause, resume, finish or
+  cancel. Backend timestamps, unique open slot and version checks prevent overlapping
+  active/paused sessions. **A running timer continues while the page is closed**;
+  recover it in Study Timer after reload and pause/cancel as appropriate. Only finished
+  sessions count as recorded study time; estimates and quiz duration remain separate.
+- **Analytics:** record-derived topic/subject progress, latest 30 quiz scores with
+  all-attempt average/best, upcoming and explicitly completed exams, estimated vs
+  recorded study time, standalone task counts and flashcard review stats. Empty
+  accounts show zero/null, not fabricated percentages. No learning-outcome predictions.
+
+### Additive MySQL migrations (existing installations)
+
+Back up MySQL and `UPLOAD_DIR` first. Apply in order from repository root:
+```bash
+mysql -u studyflow -p studyflow < apps/api/migrations/005_sprint_mode.sql
+mysql -u studyflow -p studyflow < apps/api/migrations/006_study_tasks.sql
+mysql -u studyflow -p studyflow < apps/api/migrations/007_flashcards.sql
+mysql -u studyflow -p studyflow < apps/api/migrations/008_study_sessions.sql
+```
+For a fresh database, run `mysql -u root -p < mysql_setup.sql` once instead.
+These scripts create missing tables, preserve existing records, and are rerunnable.
+They are **not** an ALTER-based upgrade of manually modified tables. Live MySQL
+execution must still be verified locally; automated runtime tests here use SQLite.
+
+### New authenticated API routes
+
+All paths below are relative to `/api/v1`; Swagger `/docs` provides request schemas.
+
+| Method | Path | Behavior |
+|---|---|---|
+| GET / POST | `/tasks` | List (q, subject/topic/exam, status, priority, overdue, inclusive due_before/due_after, limit/offset) / create |
+| GET / PUT / DELETE | `/tasks/{task_id}` | Read / partial field update / delete owner's general task |
+| GET / POST | `/flashcards` | List (q, subject, review_status, is_generated, limit/offset) / manual create |
+| POST | `/flashcards/generate` | Source type note/document, source_id, optional target links, max_cards 1–20 |
+| GET / PUT / DELETE | `/flashcards/{flashcard_id}` | Owner-scoped CRUD |
+| PATCH | `/flashcards/{flashcard_id}/review` | known or needs_revision; persists review timestamp |
+| GET / POST | `/study-sessions` | Recent sessions (limit 1–100, default 20) / start |
+| GET | `/study-sessions/active` | Recover active/paused session or null |
+| GET / DELETE | `/study-sessions/{session_id}` | Owner-scoped detail / delete |
+| POST | `/study-sessions/{session_id}/pause`, `/resume`, `/finish`, `/cancel` | Validated lifecycle transition |
+| GET | `/analytics` | Current owner's combined saved-record report |
+
+New-card/session creation requires `subject_id`; retained database references may
+become null after subject deletion. Task links are optional; topic/exam can derive
+subject context. Changing subjects requires clearing/replacing incompatible topic/exam
+links. Explicit null on non-nullable update fields is rejected. Dates use the API
+server's calendar day; Sprint retains its separate configured timezone semantics.
+
+### Checks
+```bash
+# From repository root, with the Python environment activated
+PYTHONPATH=apps/api python -m pytest apps/api/tests -q
+cd apps/web
+npm run typecheck
+npm run build
+node scripts/test-study-tools.cjs   # focused DOM loading/error/interaction checks
+node scripts/test-auth.cjs          # requires API :8000 and web :3000
+# From root, with both servers running:
+python scripts/smoke_test.py
+python scripts/smoke_study_tools.py
+```
+Frontend lint currently needs an ESLint configuration (`npm run lint` otherwise
+prompts and exits). Full-repository Ruff also reports legacy violations. See the
+[actual results and limitations](docs/enhancement-report.md), not historical phase
+reports, for verification of this enhancement.
+
+### OCR and other boundaries
+
+Scanned/image-only PDFs fail with an actionable status; **OCR is not implemented**.
+Use local OCRmyPDF/Tesseract to add a text layer and upload the converted PDF. Retry
+reprocesses original stored bytes. No private PDFs are sent to external OCR/AI APIs.
+Spaced repetition, external reminders, predictive ML, automatic mastery diagnosis and
+large-model downloads remain out of scope.
+
+## Stable interactive demo preview
+
+Use **demo@studyflow.edu** with the agreed preview password stored in ignored
+`.env.preview`. Start the preview backend with `python scripts/run_preview.py`;
+this restores missing sample fixtures without resetting saved edits or completed work.
+Normal MySQL/API startup has no automatic demo account. See
+[preview demo setup and recovery limits](docs/preview-demo.md).

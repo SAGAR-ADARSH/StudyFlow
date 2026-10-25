@@ -9,10 +9,13 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.document import Document, DocumentSummary
     from app.models.exam import Exam
+    from app.models.flashcard import Flashcard
     from app.models.note import Note
     from app.models.quiz import Quiz, QuizAttempt
     from app.models.semester import Semester
+    from app.models.study_session import StudySession
     from app.models.subject import Subject
+    from app.models.task import StudyTask
     from app.models.topic import Topic
 
 
@@ -46,4 +49,13 @@ class User(Base):
     )
     quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(
         "QuizAttempt", back_populates="user", cascade="all, delete-orphan"
+    )
+    study_tasks: Mapped[list["StudyTask"]] = relationship(
+        "StudyTask", back_populates="user", cascade="all, delete-orphan"
+    )
+    flashcards: Mapped[list["Flashcard"]] = relationship(
+        "Flashcard", back_populates="user", cascade="all, delete-orphan"
+    )
+    study_sessions: Mapped[list["StudySession"]] = relationship(
+        "StudySession", back_populates="user", cascade="all, delete-orphan"
     )

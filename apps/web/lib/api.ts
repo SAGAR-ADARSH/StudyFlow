@@ -855,3 +855,143 @@ export const updateSprintTask = (id: number, taskId: number, completed: boolean,
   request<SprintPlan>(`/sprints/${id}/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ completed, mark_topic_completed }) });
 export const setSprintStatus = (id: number, status: SprintPlan["status"]) =>
   request<SprintPlan>(`/sprints/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+
+// ---------------------------------------------------------------------
+// Study Tasks (standalone planner, distinct from Sprint tasks)
+// ---------------------------------------------------------------------
+export interface StudyTask {
+  id: number; user_id: number;
+  subject_id: number | null; topic_id: number | null; exam_id: number | null;
+  title: string; description: string | null;
+  due_date: string | null; estimated_minutes: number | null;
+  priority: "High" | "Medium" | "Low" | string; status: "Pending" | "In Progress" | "Completed" | "Cancelled" | string;
+  completed_at: string | null; created_at: string; updated_at: string | null;
+  subject_name: string | null; topic_name: string | null; exam_title: string | null;
+  is_overdue: boolean; priority_score: number; priority_reason: string;
+}
+
+export async function getTasks(params?: {
+  q?: string; subject_id?: number; topic_id?: number; exam_id?: number;
+  status?: string; priority?: string; overdue?: boolean;
+  due_before?: string; due_after?: string;
+  limit?: number; offset?: number;
+}): Promise<StudyTask[]> {
+  const qp = new URLSearchParams();
+  if (params?.q) qp.append("q", params.q);
+  if (params?.subject_id) qp.append("subject_id", params.subject_id.toString());
+  if (params?.topic_id) qp.append("topic_id", params.topic_id.toString());
+  if (params?.exam_id) qp.append("exam_id", params.exam_id.toString());
+  if (params?.status) qp.append("status", params.status);
+  if (params?.priority) qp.append("priority", params.priority);
+  if (params?.overdue !== undefined) qp.append("overdue", String(params.overdue));
+  if (params?.due_before) qp.append("due_before", params.due_before);
+  if (params?.due_after) qp.append("due_after", params.due_after);
+  if (params?.limit) qp.append("limit", params.limit.toString());
+  if (params?.offset) qp.append("offset", params.offset.toString());
+  const qs = qp.toString() ? `?${qp.toString()}` : "";
+  return request<StudyTask[]>(`/tasks${qs}`);
+}
+export async function getTask(id: number): Promise<StudyTask> { return request<StudyTask>(`/tasks/${id}`); }
+export async function createTask(payload: {
+  title: string; description?: string | null; subject_id?: number | null; topic_id?: number | null; exam_id?: number | null;
+  due_date?: string | null; estimated_minutes?: number | null; priority?: string; status?: string;
+}): Promise<StudyTask> {
+  return request<StudyTask>("/tasks", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function updateTask(id: number, payload: Partial<{
+  title: string; description: string | null; subject_id: number | null; topic_id: number | null; exam_id: number | null;
+  due_date: string | null; estimated_minutes: number | null; priority: string; status: string;
+}>): Promise<StudyTask> {
+  return request<StudyTask>(`/tasks/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+}
+export async function deleteTask(id: number): Promise<void> { return request<void>(`/tasks/${id}`, { method: "DELETE" }); }
+
+// ---------------------------------------------------------------------
+// Flashcards (simple flip-card review)
+// ---------------------------------------------------------------------
+export interface Flashcard {
+  id: number; user_id: number; subject_id: number | null; topic_id: number | null;
+  front: string; back: string; review_status: "known" | "needs_revision" | string;
+  is_generated: boolean; source_type: string | null; source_id: number | null;
+  created_at: string; updated_at: string | null; last_reviewed_at: string | null;
+  subject_name: string | null; topic_name: string | null;
+}
+
+export async function getFlashcards(params?: {
+  q?: string; subject_id?: number; review_status?: string; is_generated?: boolean; limit?: number; offset?: number;
+}): Promise<Flashcard[]> {
+  const qp = new URLSearchParams();
+  if (params?.q) qp.append("q", params.q);
+  if (params?.subject_id) qp.append("subject_id", params.subject_id.toString());
+  if (params?.review_status) qp.append("review_status", params.review_status);
+  if (params?.is_generated !== undefined) qp.append("is_generated", String(params.is_generated));
+  if (params?.limit) qp.append("limit", params.limit.toString());
+  if (params?.offset) qp.append("offset", params.offset.toString());
+  const qs = qp.toString() ? `?${qp.toString()}` : "";
+  return request<Flashcard[]>(`/flashcards${qs}`);
+}
+export async function createFlashcard(payload: { front: string; back: string; subject_id: number; topic_id?: number | null; }): Promise<Flashcard> {
+  return request<Flashcard>("/flashcards", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function updateFlashcard(id: number, payload: { front?: string; back?: string; subject_id?: number | null; topic_id?: number | null; review_status?: string; }): Promise<Flashcard> {
+  return request<Flashcard>(`/flashcards/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+}
+export async function reviewFlashcard(id: number, review_status: "known" | "needs_revision"): Promise<Flashcard> {
+  return request<Flashcard>(`/flashcards/${id}/review`, { method: "PATCH", body: JSON.stringify({ review_status }) });
+}
+export async function deleteFlashcard(id: number): Promise<void> { return request<void>(`/flashcards/${id}`, { method: "DELETE" }); }
+export async function generateFlashcards(payload: { subject_id?: number | null; topic_id?: number | null; source_type: "note" | "document"; source_id: number; max_cards?: number; }): Promise<Flashcard[]> {
+  return request<Flashcard[]>("/flashcards/generate", { method: "POST", body: JSON.stringify(payload) });
+}
+
+// ---------------------------------------------------------------------
+// Study Sessions (time tracking)
+// ---------------------------------------------------------------------
+export interface StudySession {
+  id: number; user_id: number; subject_id: number | null; topic_id: number | null;
+  status: "active" | "paused" | "completed" | "cancelled" | string;
+  started_at: string; paused_at: string | null; accumulated_seconds: number; duration_seconds: number | null;
+  created_at: string; updated_at: string | null; subject_name: string | null; topic_name: string | null;
+  elapsed_seconds: number;
+}
+
+export async function getStudySessions(limit?: number): Promise<StudySession[]> {
+  const qs = limit ? `?limit=${limit}` : "";
+  return request<StudySession[]>(`/study-sessions${qs}`);
+}
+export async function getActiveStudySession(): Promise<StudySession | null> {
+  return request<StudySession | null>("/study-sessions/active");
+}
+export async function startStudySession(payload: { subject_id: number; topic_id?: number | null; }): Promise<StudySession> {
+  return request<StudySession>("/study-sessions", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function pauseStudySession(id: number): Promise<StudySession> {
+  return request<StudySession>(`/study-sessions/${id}/pause`, { method: "POST" });
+}
+export async function resumeStudySession(id: number): Promise<StudySession> {
+  return request<StudySession>(`/study-sessions/${id}/resume`, { method: "POST" });
+}
+export async function finishStudySession(id: number): Promise<StudySession> {
+  return request<StudySession>(`/study-sessions/${id}/finish`, { method: "POST" });
+}
+export async function cancelStudySession(id: number): Promise<StudySession> {
+  return request<StudySession>(`/study-sessions/${id}/cancel`, { method: "POST" });
+}
+export async function deleteStudySession(id: number): Promise<void> { return request<void>(`/study-sessions/${id}`, { method: "DELETE" }); }
+
+// ---------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------
+export interface AnalyticsResponse {
+  topic_completion: { total: number; completed: number; in_progress: number; pending: number; completion_percent: number; };
+  subject_progress: { subject_id: number; subject_name: string; semester_name: string | null; total_topics: number; completed_topics: number; completion_percent: number; estimated_hours: number; completed_hours: number; }[];
+  quiz_history: { date: string; quiz_title: string; score_percent: number; submitted_at: string; }[];
+  quiz_average_score: number | null; quiz_best_score: number | null;
+  upcoming_exams: { id: number; title: string; subject_name: string | null; exam_date: string; status: string; days_remaining: number | null; }[];
+  completed_exams: { id: number; title: string; subject_name: string | null; exam_date: string; status: string; days_remaining: number | null; }[];
+  study_time: { estimated_hours_total: number; recorded_hours_total: number; recorded_seconds_total: number; completed_sessions: number; };
+  tasks: { total: number; pending: number; in_progress: number; completed: number; overdue: number; };
+  flashcards: { total: number; known: number; needs_revision: number; };
+  generated_at: string;
+}
+export async function getAnalytics(): Promise<AnalyticsResponse> { return request<AnalyticsResponse>("/analytics"); }
